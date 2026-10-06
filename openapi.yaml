@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: Print Quote Service
+  version: 1.0.0
+  description: Prices custom sticker orders and lets customers accept a quote within its validity window.
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "204": { description: Service is up }
+  /v1/quotes:
+    post:
+      summary: Create a quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateQuoteRequest" }
+      responses:
+        "201":
+          description: Quote created
+          headers:
+            Location: { schema: { type: string }, description: URL of the new quote }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quote" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+    get:
+      summary: List the most recent quotes
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Quotes, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Quote" }
+        "400": { $ref: "#/components/responses/Problem" }
+  /v1/quotes/{id}:
+    get:
+      summary: Get a quote
+      parameters: [{ $ref: "#/components/parameters/QuoteId" }]
+      responses:
+        "200":
+          description: The quote
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quote" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/quotes/{id}/accept:
+    post:
+      summary: Accept a pending quote
+      parameters: [{ $ref: "#/components/parameters/QuoteId" }]
+      responses:
+        "200":
+          description: The accepted quote
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Quote" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+components:
+  parameters:
+    QuoteId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, example: qt_3f9a1c0b7d2e4f6a8b9c0d1e2f3a4b5c }
+  responses:
+    Problem:
+      description: RFC 9457 problem details
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            properties:
+              title: { type: string }
+              status: { type: integer }
+              detail: { type: string }
+  schemas:
+    CreateQuoteRequest:
+      type: object
+      required: [product, widthInches, heightInches, quantity]
+      additionalProperties: false
+      properties:
+        product: { type: string, enum: [die-cut, circle, rectangle] }
+        widthInches: { type: integer, minimum: 1, maximum: 24 }
+        heightInches: { type: integer, minimum: 1, maximum: 24 }
+        quantity: { type: integer, minimum: 1, maximum: 100000 }
+    Quote:
+      type: object
+      properties:
+        id: { type: string }
+        product: { type: string }
+        widthInches: { type: integer }
+        heightInches: { type: integer }
+        quantity: { type: integer }
+        subtotalCents: { type: integer, format: int64 }
+        discountCents: { type: integer, format: int64 }
+        totalCents: { type: integer, format: int64 }
+        totalDisplay: { type: string, example: "$30.00" }
+        status: { type: string, enum: [pending, accepted, expired] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time }
